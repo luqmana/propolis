@@ -276,6 +276,7 @@ async fn instance_ensure(
                             .config
                             .block_dev::<propolis::hw::virtio::block::Request>(
                             block_dev_name,
+                            None,
                         );
 
                         let bdf: pci::Bdf =
