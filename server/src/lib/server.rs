@@ -170,9 +170,13 @@ async fn instance_ensure(
 ) -> Result<HttpResponseCreated<api::InstanceEnsureResponse>, HttpError> {
     let server_context = rqctx.context();
 
+    let instance_id = path_params.into_inner().instance_id;
     let request = request.into_inner();
+
+    info!(rqctx.log, "instance ensure: {:?}  {:#?}", instance_id, request);
+
     let (properties, nics) = (request.properties, request.nics);
-    if path_params.into_inner().instance_id != properties.id {
+    if instance_id != properties.id {
         return Err(HttpError::for_internal_error(
             "UUID mismatch (path did not match struct)".to_string(),
         ));
