@@ -17,7 +17,7 @@ thiserror = "1.0"
 bhyve_api = { path = "../bhyve-api" }
 dladm = { path = "../dladm" }
 viona_api = { path = "../viona-api" }
-usdt = "0.1.11"
+usdt = "0.1.13"
 crucible = { git = "https://github.com/oxidecomputer/crucible", branch = "main", optional = true }
 # crucible = { path = "../../crucible/upstairs", optional = true }
 bytes = "1"
