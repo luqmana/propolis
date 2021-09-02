@@ -34,7 +34,7 @@ use propolis::instance::Instance;
 use propolis_client::api;
 
 use crate::config::Config;
-use crate::initializer::{build_instance, MachineInitializer, DispatcherInfo};
+use crate::initializer::{build_instance, DispatcherInfo, MachineInitializer};
 use crate::serial::Serial;
 
 // TODO(error) Do a pass of HTTP codes (error and ok)
@@ -177,7 +177,8 @@ async fn instance_ensure(
 
     info!(rqctx.log, "instance ensure: {:?}  {:#?}", instance_id, request);
 
-    let (properties, nics, disks) = (request.properties, request.nics, request.disks);
+    let (properties, nics, disks) =
+        (request.properties, request.nics, request.disks);
     if instance_id != properties.id {
         return Err(HttpError::for_internal_error(
             "UUID mismatch (path did not match struct)".to_string(),
@@ -263,7 +264,8 @@ async fn instance_ensure(
             }
 
             for disk in &disks {
-                let bdf = slot_to_bdf(disk.slot, SlotType::Disk).map_err(|e| {
+                let bdf =
+                    slot_to_bdf(disk.slot, SlotType::Disk).map_err(|e| {
                         Error::new(
                             ErrorKind::InvalidData,
                             format!("Cannot parse disk PCI: {}", e),
@@ -272,10 +274,7 @@ async fn instance_ensure(
 
                 // TODO: Does it matter that we're passing a "None" runtime?
                 // ... Should we pass a real one?
-                let disps = DispatcherInfo {
-                    disp,
-                    tokio_runtime: None,
-                };
+                let disps = DispatcherInfo { disp, tokio_runtime: None };
                 init.initialize_crucible(&chipset, disk, bdf, disps)?;
             }
 

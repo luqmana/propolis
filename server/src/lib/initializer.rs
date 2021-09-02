@@ -253,14 +253,23 @@ impl<'a> MachineInitializer<'a> {
         disp: DispatcherInfo,
     ) -> Result<(), Error> {
         // TODO: This is hacky. Why are we assuming the addresses are v4?
-        let addresses = disk.address.clone().into_iter().map(|a| {
-            if let SocketAddr::V4(v4) = a { v4 } else { panic!("no ipv6, apparently") }
-        }).collect();
+        let addresses = disk
+            .address
+            .clone()
+            .into_iter()
+            .map(|a| {
+                if let SocketAddr::V4(v4) = a {
+                    v4
+                } else {
+                    panic!("no ipv6, apparently")
+                }
+            })
+            .collect();
 
-        let bdev = propolis::hw::crucible::block::CrucibleBlockDev::<propolis::hw::virtio::block::Request>::from_options(
-            addresses,
-            &disp.tokio_runtime,
-            disk.read_only,
+        let bdev = propolis::hw::crucible::block::CrucibleBlockDev::<
+            propolis::hw::virtio::block::Request,
+        >::from_options(
+            addresses, &disp.tokio_runtime, disk.read_only
         )?;
         self.initialize_block(chipset, bdf, &disk.name, bdev)?;
         Ok(())
