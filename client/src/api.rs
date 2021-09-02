@@ -161,6 +161,7 @@ type DiskFlags = u32;
 
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 pub struct DiskRequest {
+    pub name: String,
     pub address: Vec<SocketAddr>,
     pub slot: Slot,
     pub read_only: bool,

@@ -18,6 +18,7 @@ use propolis::hw::virtio;
 use propolis::instance::Instance;
 use propolis::inventory::{EntityID, Inventory};
 use propolis::vmm::{self, Builder, Machine, MachineCtx, Prot};
+use std::net::SocketAddr;
 
 use crate::serial::Serial;
 
@@ -85,6 +86,11 @@ impl RegisteredChipset {
     pub fn id(&self) -> EntityID {
         self.1
     }
+}
+
+pub struct DispatcherInfo<'a> {
+    pub disp: &'a Dispatcher,
+    pub tokio_runtime: Option<tokio::runtime::Runtime>,
 }
 
 pub struct MachineInitializer<'a> {
@@ -236,6 +242,27 @@ impl<'a> MachineInitializer<'a> {
         let hdl = self.machine.get_hdl();
         let viona = virtio::viona::VirtioViona::create(vnic_name, 0x100, &hdl)?;
         chipset.device().pci_attach(bdf, viona);
+        Ok(())
+    }
+
+    pub fn initialize_crucible(
+        &self,
+        chipset: &RegisteredChipset,
+        disk: &propolis_client::api::DiskRequest,
+        bdf: pci::Bdf,
+        disp: DispatcherInfo,
+    ) -> Result<(), Error> {
+        // TODO: This is hacky. Why are we assuming the addresses are v4?
+        let addresses = disk.address.clone().into_iter().map(|a| {
+            if let SocketAddr::V4(v4) = a { v4 } else { panic!("no ipv6, apparently") }
+        }).collect();
+
+        let bdev = propolis::hw::crucible::block::CrucibleBlockDev::<propolis::hw::virtio::block::Request>::from_options(
+            addresses,
+            &disp.tokio_runtime,
+            disk.read_only,
+        )?;
+        self.initialize_block(chipset, bdf, &disk.name, bdev)?;
         Ok(())
     }
 
