@@ -18,6 +18,7 @@ use propolis::hw::virtio;
 use propolis::instance::Instance;
 use propolis::inventory::{EntityID, Inventory};
 use propolis::vmm::{self, Builder, Machine, MachineCtx, Prot};
+use slog::info;
 use std::net::SocketAddr;
 
 use crate::serial::Serial;
@@ -94,6 +95,7 @@ pub struct DispatcherInfo<'a> {
 }
 
 pub struct MachineInitializer<'a> {
+    log: slog::Logger,
     machine: &'a Machine,
     mctx: &'a MachineCtx,
     disp: &'a Dispatcher,
@@ -102,12 +104,13 @@ pub struct MachineInitializer<'a> {
 
 impl<'a> MachineInitializer<'a> {
     pub fn new(
+        log: slog::Logger,
         machine: &'a Machine,
         mctx: &'a MachineCtx,
         disp: &'a Dispatcher,
         inv: &'a Inventory,
     ) -> Self {
-        MachineInitializer { machine, mctx, disp, inv }
+        MachineInitializer { log, machine, mctx, disp, inv }
     }
 
     pub fn initialize_rom<P: AsRef<std::path::Path>>(
@@ -266,11 +269,13 @@ impl<'a> MachineInitializer<'a> {
             })
             .collect();
 
+        info!(self.log, "Creating CrucibleBlockDev from {:#?}", addresses);
         let bdev = propolis::hw::crucible::block::CrucibleBlockDev::<
             propolis::hw::virtio::block::Request,
         >::from_options(
             addresses, &disp.tokio_runtime, disk.read_only
         )?;
+        info!(self.log, "Initializing block device: {}", disk.name);
         self.initialize_block(chipset, bdf, &disk.name, bdev)?;
         Ok(())
     }

@@ -243,7 +243,13 @@ async fn instance_ensure(
 
     instance
         .initialize(|machine, mctx, disp, inv| {
-            let init = MachineInitializer::new(machine, mctx, disp, inv);
+            let init = MachineInitializer::new(
+                rqctx.log.new(o!()),
+                machine,
+                mctx,
+                disp,
+                inv,
+            );
             init.initialize_rom(server_context.config.get_bootrom())?;
             machine.initialize_rtc(lowmem, highmem).unwrap();
             let chipset = init.initialize_chipset()?;
@@ -253,6 +259,7 @@ async fn instance_ensure(
 
             // Attach devices which have been requested from the HTTP interface.
             for nic in &nics {
+                info!(rqctx.log, "Creating NIC: {:#?}", nic);
                 let bdf =
                     slot_to_bdf(nic.slot, SlotType::NIC).map_err(|e| {
                         Error::new(
@@ -264,6 +271,7 @@ async fn instance_ensure(
             }
 
             for disk in &disks {
+                info!(rqctx.log, "Creating Disk: {:#?}", disk);
                 let bdf =
                     slot_to_bdf(disk.slot, SlotType::Disk).map_err(|e| {
                         Error::new(
@@ -276,6 +284,7 @@ async fn instance_ensure(
                 // ... Should we pass a real one?
                 let disps = DispatcherInfo { disp, tokio_runtime: None };
                 init.initialize_crucible(&chipset, disk, bdf, disps)?;
+                info!(rqctx.log, "Disk {} created successfully", disk.name);
             }
 
             // Attach devices which are hard-coded in the config.
