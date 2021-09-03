@@ -280,9 +280,13 @@ async fn instance_ensure(
                         )
                     })?;
 
-                // TODO: Does it matter that we're passing a "None" runtime?
-                // ... Should we pass a real one?
-                let disps = DispatcherInfo { disp, tokio_runtime: None };
+                let runtime = tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(10)
+                    .thread_name("crucible-tokio")
+                    .enable_all()
+                    .build()
+                    .unwrap();
+                let disps = DispatcherInfo { disp, tokio_runtime: Some(runtime) };
                 init.initialize_crucible(&chipset, disk, bdf, disps)?;
                 info!(rqctx.log, "Disk {} created successfully", disk.name);
             }
