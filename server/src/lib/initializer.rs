@@ -91,7 +91,7 @@ impl RegisteredChipset {
 
 pub struct DispatcherInfo<'a> {
     pub disp: &'a Dispatcher,
-    pub tokio_runtime: Option<tokio::runtime::Runtime>,
+    pub tokio_runtime: &'a Option<tokio::runtime::Runtime>,
 }
 
 pub struct MachineInitializer<'a> {

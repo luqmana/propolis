@@ -83,6 +83,8 @@ struct InstanceContext {
     serial: Arc<Mutex<Serial<DispCtx, LpcUart>>>,
     state_watcher: watch::Receiver<StateChange>,
     serial_task: Option<SerialTask>,
+    // Just keep this alive until the instance goes away.
+    _runtime: Option<tokio::runtime::Runtime>,
 }
 
 /// Contextual information accessible from HTTP callbacks.
@@ -219,6 +221,13 @@ async fn instance_ensure(
     let lowmem = memsize.min(3 * GB);
     let highmem = memsize.saturating_sub(3 * GB);
 
+    let runtime = Some(tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(10)
+        .thread_name("crucible-tokio")
+        .enable_all()
+        .build()
+        .unwrap());
+
     // Create the instance.
     //
     // The VM is named after the UUID, ensuring that it is unique.
@@ -280,13 +289,7 @@ async fn instance_ensure(
                         )
                     })?;
 
-                let runtime = tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(10)
-                    .thread_name("crucible-tokio")
-                    .enable_all()
-                    .build()
-                    .unwrap();
-                let disps = DispatcherInfo { disp, tokio_runtime: Some(runtime) };
+                let disps = DispatcherInfo { disp, tokio_runtime: &runtime };
                 init.initialize_crucible(&chipset, disk, bdf, disps)?;
                 info!(rqctx.log, "Disk {} created successfully", disk.name);
             }
@@ -386,6 +389,7 @@ async fn instance_ensure(
         serial: Arc::new(Mutex::new(com1.unwrap())),
         state_watcher: rx,
         serial_task: None,
+        _runtime: runtime,
     });
 
     Ok(HttpResponseCreated(api::InstanceEnsureResponse {}))
