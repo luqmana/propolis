@@ -9,7 +9,7 @@ use crate::common::*;
 use crate::dispatch::DispCtx;
 use crate::instance;
 use crate::intr_pins::IntrPin;
-use crate::inventory::Entity;
+use crate::inventory::{Entity, Record};
 use crate::mmio::MmioDev;
 use crate::pio::PioDev;
 use crate::util::regmap::{Flags, RegMap};
@@ -829,6 +829,11 @@ impl Entity for DeviceInst {
             self.do_reset(ctx);
         }
         self.inner.state_transition(next, target, ctx);
+    }
+
+    fn serialize(&self, record: &Record) -> Box<dyn erased_serde::Serialize> {
+        // TODO: Need to serialize the generic pci device state as well
+        self.inner.serialize(record)
     }
 }
 

@@ -230,6 +230,7 @@ fn main() {
                 "pci-nvme" => {
                     let nvme = hw::nvme::PciNvme::create(0x1de, 0x1000);
                     devices.insert(&**name, nvme.clone());
+                    inv.register(&nvme, format!("nvme-{}", name), None)?;
                     chipset.pci_attach(bdf.unwrap(), nvme);
                 }
                 "nvme-ns" => {
@@ -310,6 +311,12 @@ fn main() {
     println!("Waiting for a connection to ttya...");
     com1_sock.wait_for_connect();
 
+    // Add signal handler to halt VM on Ctrl-C
+    let ctrl_inst = inst.clone();
+    ctrlc::set_handler(move || ctrl_inst.set_target_state(ReqState::Halt).unwrap())
+        .expect("Error setting Ctrl-C handler.");
+
+
     inst.on_transition(Box::new(|next_state, ctx| {
         match next_state {
             State::Boot => {
@@ -335,5 +342,8 @@ fn main() {
     inst.set_target_state(ReqState::Run).unwrap();
 
     inst.wait_for_state(State::Destroy);
+
+    inst.serialize();
+
     drop(inst);
 }

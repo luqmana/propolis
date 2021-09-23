@@ -12,6 +12,7 @@ use super::queue::{Chain, VirtQueue};
 use super::VirtioDevice;
 
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 /// Sizing for virtio-block is specified in 512B sectors
 const SECTOR_SZ: usize = 512;
@@ -135,7 +136,14 @@ impl VirtioDevice for VirtioBlock {
         }
     }
 }
-impl Entity for VirtioBlock {}
+impl Entity for VirtioBlock {
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(BlockState {})
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct BlockState {}
 
 pub struct Request {
     op: BlockOp,

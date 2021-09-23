@@ -6,6 +6,7 @@ use crate::hw::qemu::fwcfg::{self, FwCfgBuilder, Item};
 use crate::util::regmap::RegMap;
 
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum Reg {
@@ -132,4 +133,11 @@ impl Item for RamFb {
         Ok(())
     }
 }
-impl Entity for RamFb {}
+impl Entity for RamFb {
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(RamFbState {})
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct RamFbState {}

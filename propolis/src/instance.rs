@@ -2,12 +2,13 @@
 
 #![allow(unused)]
 
+use std::collections::HashMap;
 use std::io;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 
 use crate::dispatch::*;
-use crate::inventory::{self, Inventory};
+use crate::inventory::{self, Inventory, Order};
 use crate::vcpu::VcpuRunFunc;
 use crate::vmm::*;
 
@@ -421,6 +422,16 @@ impl Instance {
     pub fn print(&self) {
         let state = self.inner.lock().unwrap();
         state.inv.print()
+    }
+
+    pub fn serialize(&self) {
+        let state = self.inner.lock().unwrap();
+        let mut devices = HashMap::new();
+        state.inv.for_each_node(Order::Pre, |_, record| {
+            devices.insert(record.name().to_owned(), record.entity().serialize(record));
+        });
+        let ron = ron::ser::to_string(&devices).unwrap();
+        println!("{}", ron);
     }
 }
 

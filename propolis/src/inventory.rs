@@ -405,6 +405,10 @@ pub trait Entity: Send + Sync + 'static {
         ctx: &DispCtx,
     ) {
     }
+
+    fn serialize(&self, record: &Record) -> Box<dyn erased_serde::Serialize> {
+        todo!("Entity ({}) does not support serialization", record.name());
+    }
 }
 
 /// ID referencing an entity stored within the inventory.

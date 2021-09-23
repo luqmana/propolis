@@ -8,6 +8,8 @@ use crate::instance;
 use crate::intr_pins::{IntrPin, LegacyPin};
 use crate::pio::{PioBus, PioDev};
 
+use serde::{Deserialize, Serialize};
+
 pub const REGISTER_LEN: usize = 8;
 
 struct UartState {
@@ -147,4 +149,11 @@ impl Entity for LpcUart {
             self.reset();
         }
     }
+
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(LpcUartState {})
+    }
 }
+
+#[derive(Deserialize, Serialize)]
+struct LpcUartState {}

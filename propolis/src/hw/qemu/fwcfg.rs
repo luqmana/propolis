@@ -7,6 +7,7 @@ use crate::pio::{PioBus, PioDev};
 use bits::*;
 
 use byteorder::{ByteOrder, BE, LE};
+use serde::{Deserialize, Serialize};
 
 pub type Result = std::result::Result<(), &'static str>;
 
@@ -648,7 +649,14 @@ impl PioDev for FwCfg {
     }
 }
 
-impl Entity for FwCfg {}
+impl Entity for FwCfg {
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(FwCfgState {})
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct FwCfgState {}
 
 mod bits {
     #![allow(unused)]

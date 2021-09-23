@@ -9,6 +9,7 @@ use crate::hw::pci;
 use crate::util::regmap::RegMap;
 
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub use ns::{NvmeNs, Request};
@@ -726,7 +727,14 @@ impl pci::Device for PciNvme {
         self.state.lock().unwrap().msix_hdl = msix_hdl;
     }
 }
-impl Entity for PciNvme {}
+impl Entity for PciNvme {
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(NvmeState {})
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct NvmeState {}
 
 /// NVMe Controller Registers
 ///

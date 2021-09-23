@@ -487,6 +487,11 @@ impl Entity for PciVirtio {
         }
         self.dev.state_transition(next, target, ctx)
     }
+
+    fn serialize(&self, record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        // TODO: Need to serialize the generic virtio device state as well
+        self.dev.serialize(record)
+    }
 }
 
 struct IsrIntr {

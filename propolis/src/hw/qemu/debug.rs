@@ -5,6 +5,8 @@ use crate::common::*;
 use crate::dispatch::DispCtx;
 use crate::pio::{PioBus, PioDev};
 
+use serde::{Deserialize, Serialize};
+
 const QEMU_DEBUG_IOPORT: u16 = 0x0402;
 const QEMU_DEBUG_IDENT: u8 = 0xe9;
 
@@ -46,4 +48,11 @@ impl BlockingSource for QemuDebugPort {
     }
 }
 
-impl Entity for QemuDebugPort {}
+impl Entity for QemuDebugPort {
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(QemuDebugPortState {})
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct QemuDebugPortState {}

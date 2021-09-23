@@ -10,6 +10,8 @@ use crate::instance;
 use crate::intr_pins::LegacyPin;
 use crate::pio::{PioBus, PioDev};
 
+use serde::{Deserialize, Serialize};
+
 bitflags! {
     #[derive(Default)]
     pub struct CtrlStatus: u8 {
@@ -277,7 +279,14 @@ impl PioDev for PS2Ctrl {
         }
     }
 }
-impl Entity for PS2Ctrl {}
+impl Entity for PS2Ctrl {
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(PS2CtrlState {})
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+struct PS2CtrlState {}
 
 const PS2K_CMD_SET_LEDS: u8 = 0xed;
 const PS2K_CMD_SCAN_CODE: u8 = 0xf0;

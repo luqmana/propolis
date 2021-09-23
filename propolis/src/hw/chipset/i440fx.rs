@@ -14,6 +14,7 @@ use crate::util::self_arc::*;
 use crate::vmm::{MachineCtx, VmmHdl};
 
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 const HB_DEV: u8 = 0;
 const HB_FUNC: u8 = 0;
@@ -182,6 +183,10 @@ impl Entity for I440Fx {
         let bus = self.pci_bus.lock().unwrap();
         let pm = bus.device_at(PM_DEV, PM_FUNC).unwrap().as_devinst().unwrap();
         pm.state_transition(next, target, ctx);
+    }
+
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(I440FxState {})
     }
 }
 
@@ -728,3 +733,6 @@ impl SelfArc for Piix3PM {
         &self.sa_cell
     }
 }
+
+#[derive(Deserialize, Serialize)]
+struct I440FxState {}

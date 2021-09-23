@@ -18,6 +18,7 @@ use super::queue::VirtQueue;
 use super::{VirtioDevice, VqChange, VqIntr};
 
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use tokio::io::unix::AsyncFd;
 use tokio::io::Interest;
 
@@ -242,12 +243,18 @@ impl Entity for VirtioViona {
             _ => {}
         }
     }
+    fn serialize(&self, _record: &crate::inventory::Record) -> Box<dyn erased_serde::Serialize> {
+        Box::new(VionaState {})
+    }
 }
 impl SelfArc for VirtioViona {
     fn self_arc_cell(&self) -> &SelfArcCell<Self> {
         &self.sa_cell
     }
 }
+
+#[derive(Deserialize, Serialize)]
+struct VionaState {}
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum NetReg {
