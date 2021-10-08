@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 use std::mem::size_of;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 
 use crate::dispatch::DispCtx;
 use crate::hw::pci;
@@ -18,6 +18,22 @@ mod requests;
 
 use bits::*;
 use queue::{CompQueue, QueueId, SubQueue};
+
+#[cfg(not(test))]
+mod uses {
+    pub use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    pub use std::sync::Arc;
+}
+
+#[cfg(test)]
+mod uses {
+    pub use loom::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    pub use loom::sync::Arc;
+}
+
+// Import the normal std/propolis structures or
+// the loom/testing versions depending on cfg(test)
+use uses::*;
 
 /// The max number of MSI-X interrupts we support
 const NVME_MSIX_COUNT: u16 = 1024;
@@ -288,7 +304,7 @@ impl PciNvme {
         vendor: u16,
         device: u16,
         binfo: block::DeviceInfo,
-    ) -> Arc<pci::DeviceInst> {
+    ) -> std::sync::Arc<pci::DeviceInst> {
         let builder = pci::Builder::new(pci::Ident {
             vendor_id: vendor,
             device_id: device,
@@ -403,7 +419,7 @@ impl PciNvme {
             // BAR2 is for the optional index/data registers
             // Place MSIX in BAR4 for now
             .add_cap_msix(pci::BarN::BAR4, NVME_MSIX_COUNT)
-            .finish(Arc::new(nvme))
+            .finish(std::sync::Arc::new(nvme))
     }
 
     /// Service a write to the NVMe Controller Configuration from the VM

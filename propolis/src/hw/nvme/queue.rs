@@ -1,9 +1,8 @@
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
 
 use super::bits::{self, RawCompletion, RawSubmission};
 use super::cmds::Completion;
+use super::uses::*;
 use crate::common::*;
 use crate::dispatch::DispCtx;
 use crate::hw::pci;
@@ -39,9 +38,11 @@ const MAX_ADMIN_QUEUE_SIZE: u32 = 1 << 12;
 pub const ADMIN_QUEUE_ID: QueueId = 0;
 
 /// Marker type to indicate a Completion Queue.
+#[derive(Debug)]
 enum CompletionQueueType {}
 
 /// Marker type to indicate a Submission Queue.
+#[derive(Debug)]
 enum SubmissionQueueType {}
 
 bitstruct! {
@@ -106,6 +107,7 @@ bitstruct! {
 /// methods exposed based on whether the queue in question
 /// is a Completion or Submission queue. Use either
 /// `CompletionQueueType` or `SubmissionQueueType`.
+#[derive(Debug)]
 struct QueueState<QT> {
     /// The size of the queue in question.
     ///
@@ -322,6 +324,7 @@ pub enum QueueUpdateError {
 }
 
 /// Type for manipulating Submission Queues.
+#[derive(Debug)]
 pub struct SubQueue {
     /// The ID of this Submission Queue.
     id: QueueId,
@@ -426,6 +429,7 @@ impl SubQueue {
 }
 
 /// Type for manipulating Completion Queues.
+#[derive(Debug)]
 pub struct CompQueue {
     /// The Interrupt Vector used to signal to the host (VM) upon pushing
     /// entries onto the Completion Queue.
@@ -615,5 +619,233 @@ impl CompQueueEntryPermit {
                 Some(state.with_avail(avail + 1).0)
             })
             .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use loom::thread::spawn;
+
+    use super::*;
+
+    use crate::{
+        common::GuestAddr,
+        dispatch::{SharedCtx, SyncCtx},
+        instance::Instance,
+    };
+    use std::assert_matches::assert_matches;
+    use std::io::Error;
+
+    #[test]
+    fn create_cq_queues() -> Result<(), Error> {
+        let instance = Instance::new_test(None)?;
+        let hdl = pci::MsixHdl::new_test();
+        let read_base = GuestAddr(0);
+        let write_base = GuestAddr(1024 * 1024);
+
+        loom::model(move || {
+            let mut sctx =
+                SyncCtx::standalone(SharedCtx::create(&instance.disp));
+            let ctx = sctx.dispctx();
+
+            // Admin queues must be less than 4K
+            let cq = CompQueue::new(
+                ADMIN_QUEUE_ID,
+                0,
+                1024,
+                write_base,
+                &ctx,
+                hdl.clone(),
+            );
+            assert_matches!(cq, Ok(_));
+            let cq = CompQueue::new(
+                ADMIN_QUEUE_ID,
+                0,
+                5 * 1024,
+                write_base,
+                &ctx,
+                hdl.clone(),
+            );
+            assert_matches!(cq, Err(QueueCreateErr::InvalidSize));
+
+            // I/O queues must be less than 64K
+            let cq = CompQueue::new(1, 0, 1024, write_base, &ctx, hdl.clone());
+            assert_matches!(cq, Ok(_));
+            let cq =
+                CompQueue::new(1, 0, 65 * 1024, write_base, &ctx, hdl.clone());
+            assert_matches!(cq, Err(QueueCreateErr::InvalidSize));
+
+            // Neither must be less than 2
+            let cq = CompQueue::new(
+                ADMIN_QUEUE_ID,
+                0,
+                1,
+                write_base,
+                &ctx,
+                hdl.clone(),
+            );
+            assert_matches!(cq, Err(QueueCreateErr::InvalidSize));
+            let cq = CompQueue::new(1, 0, 1, write_base, &ctx, hdl.clone());
+            assert_matches!(cq, Err(QueueCreateErr::InvalidSize));
+
+            // Completion Queue's must be mapped to writable memory
+            let cq = CompQueue::new(
+                ADMIN_QUEUE_ID,
+                0,
+                2,
+                read_base,
+                &ctx,
+                hdl.clone(),
+            );
+            assert_matches!(cq, Err(QueueCreateErr::InvalidBaseAddr));
+            let cq = CompQueue::new(1, 0, 2, read_base, &ctx, hdl.clone());
+            assert_matches!(cq, Err(QueueCreateErr::InvalidBaseAddr));
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn create_sq_queues() -> Result<(), Error> {
+        let instance = Instance::new_test(None)?;
+        let hdl = pci::MsixHdl::new_test();
+        let read_base = GuestAddr(0);
+        let write_base = GuestAddr(1024 * 1024);
+
+        loom::model(move || {
+            let mut sctx =
+                SyncCtx::standalone(SharedCtx::create(&instance.disp));
+            let ctx = sctx.dispctx();
+
+            // Create corresponding CQs
+            let admin_cq = Arc::new(
+                CompQueue::new(
+                    ADMIN_QUEUE_ID,
+                    0,
+                    1024,
+                    write_base,
+                    &ctx,
+                    hdl.clone(),
+                )
+                .unwrap(),
+            );
+            let io_cq = Arc::new(
+                CompQueue::new(1, 0, 1024, write_base, &ctx, hdl.clone())
+                    .unwrap(),
+            );
+
+            // Admin queues must be less than 4K
+            let sq = SubQueue::new(
+                ADMIN_QUEUE_ID,
+                admin_cq.clone(),
+                1024,
+                read_base,
+                &ctx,
+            );
+            assert_matches!(sq, Ok(_));
+            let sq = SubQueue::new(
+                ADMIN_QUEUE_ID,
+                admin_cq.clone(),
+                5 * 1024,
+                read_base,
+                &ctx,
+            );
+            assert_matches!(sq, Err(QueueCreateErr::InvalidSize));
+
+            // I/O queues must be less than 64K
+            let sq = SubQueue::new(1, io_cq.clone(), 1024, read_base, &ctx);
+            assert_matches!(sq, Ok(_));
+            let sq =
+                SubQueue::new(1, io_cq.clone(), 65 * 1024, read_base, &ctx);
+            assert_matches!(sq, Err(QueueCreateErr::InvalidSize));
+
+            // Neither must be less than 2
+            let sq = SubQueue::new(
+                ADMIN_QUEUE_ID,
+                admin_cq.clone(),
+                1,
+                read_base,
+                &ctx,
+            );
+            assert_matches!(sq, Err(QueueCreateErr::InvalidSize));
+            let sq = SubQueue::new(1, admin_cq.clone(), 1, read_base, &ctx);
+            assert_matches!(sq, Err(QueueCreateErr::InvalidSize));
+
+            // Completion Queue's must be mapped to readable memory
+            let sq = SubQueue::new(
+                ADMIN_QUEUE_ID,
+                admin_cq.clone(),
+                2,
+                write_base,
+                &ctx,
+            );
+            assert_matches!(sq, Err(QueueCreateErr::InvalidBaseAddr));
+            let sq = SubQueue::new(1, admin_cq.clone(), 2, write_base, &ctx);
+            assert_matches!(sq, Err(QueueCreateErr::InvalidBaseAddr));
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn push_pop() -> Result<(), Error> {
+        let instance = Instance::new_test(None)?;
+        let hdl = pci::MsixHdl::new_test();
+        let read_base = GuestAddr(0);
+        let write_base = GuestAddr(1024 * 1024);
+
+        loom::model(move || {
+            let mut sctx =
+                SyncCtx::standalone(SharedCtx::create(&instance.disp));
+            let ctx = sctx.dispctx();
+
+            let cq = Arc::new(
+                CompQueue::new(1, 0, 2, write_base, &ctx, hdl.clone()).unwrap(),
+            );
+            let sq = Arc::new(
+                SubQueue::new(1, cq.clone(), 2, read_base, &ctx).unwrap(),
+            );
+
+            let (tx, rx) = crossbeam_channel::unbounded();
+
+            let workers = (0..2)
+                .map(|_| {
+                    let worker_instance = instance.clone();
+                    let worker_sq = sq.clone();
+                    let worker_rx = rx.clone();
+                    spawn(move || {
+                        let mut sctx = SyncCtx::standalone(SharedCtx::create(
+                            &worker_instance.disp,
+                        ));
+                        let ctx = sctx.dispctx();
+
+                        loop {
+                            match worker_rx.recv() {
+                                Ok(_) => {
+                                    if let Some((_, _)) = worker_sq.pop(&ctx) {
+                                        break;
+                                    }
+                                },
+                                Err(_) => break,
+                            }
+                        }
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            assert_matches!(sq.notify_tail(1), Ok(_));
+            tx.send(()).unwrap();
+
+            assert_matches!(sq.notify_tail(1), Ok(_));
+            tx.send(()).unwrap();
+
+            drop(rx);
+            drop(tx);
+
+            for worker in workers {
+                worker.join().unwrap();
+            }
+        });
+        Ok(())
     }
 }

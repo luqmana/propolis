@@ -1,6 +1,10 @@
+#![allow(clippy::style)]
 // Pull in asm!() support for USDT
 #![feature(asm)]
-#![allow(clippy::style)]
+// Pull in `arbitrary_self_types` for loom's Arc type as Self in tests
+#![cfg_attr(test, feature(arbitrary_self_types))]
+// Pull in `assert_matches` for tests
+#![cfg_attr(test, feature(assert_matches))]
 
 use usdt::dtrace_provider;
 
