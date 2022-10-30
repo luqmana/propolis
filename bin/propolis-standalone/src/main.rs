@@ -825,6 +825,12 @@ fn setup_instance(
 
                 chipset.pci_attach(bdf, nvme);
             }
+            "pci-xhci" => {
+                let bdf = bdf.unwrap();
+                let xhci = hw::usb::xhci::PciXhci::create();
+                inv.register_instance(&xhci, bdf.to_string())?;
+                chipset.pci_attach(bdf, xhci);
+            }
             _ => {
                 slog::error!(log, "unrecognized driver"; "name" => name);
                 return Err(Error::new(
