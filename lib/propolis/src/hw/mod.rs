@@ -7,4 +7,5 @@ pub mod pci;
 pub mod ps2;
 pub mod qemu;
 pub mod uart;
+pub mod usb;
 pub mod virtio;
