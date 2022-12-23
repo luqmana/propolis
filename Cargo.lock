@@ -2767,6 +2767,7 @@ dependencies = [
  "bhyve_api",
  "bitflags",
  "bitstruct",
+ "bitvec",
  "byteorder",
  "crossbeam-channel",
  "crucible",
