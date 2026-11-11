@@ -273,7 +273,7 @@ impl Builder {
         let guest_hv_interface = self
             .guest_hv_interface
             .take()
-            .unwrap_or(Arc::new(BhyveGuestInterface));
+            .unwrap_or(Arc::new(BhyveGuestInterface::new()));
 
         guest_hv_interface.attach(&acc_mem, hdl.clone());
         let vcpus = (0..self.max_cpu)
